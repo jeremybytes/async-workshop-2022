@@ -1,0 +1,9 @@
+﻿@{ ViewData["Title"] = "Home Page"; }
+
+<div>
+    <h1>Please make a selection</h1>
+    <ul>
+        <li><strong>@Html.ActionLink("Get People using Task", "WithTask", "People")</strong></li>
+        <li><strong>@Html.ActionLink("Get People using Await", "WithAwait", "People")</strong></li>
+    </ul>
+</div>

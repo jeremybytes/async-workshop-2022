@@ -1,0 +1,20 @@
+﻿@model IEnumerable<TaskAwait.Shared.Person>
+
+<h1>Commanders - @ViewData["Title"]</h1>
+
+<section>
+
+    @foreach (var person in Model)
+    {
+<div data="@person.StartDate.Year.ToString()[2]">
+    <span class="name">@person.ToString()</span>
+    <span class="year">@person.StartDate.Year</span>
+    <span class="rating">@person.Rating/10 stars</span>
+</div>}
+
+</section>
+
+<hr />
+<h3>Timing</h3>
+<div>Request start: @ViewData["RequestStart"]</div>
+<div>Request end: @ViewData["RequestEnd"]</div>

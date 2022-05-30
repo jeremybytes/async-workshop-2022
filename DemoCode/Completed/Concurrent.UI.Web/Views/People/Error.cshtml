@@ -1,0 +1,13 @@
+﻿@model IEnumerable<System.Exception>
+
+<h1>ERROR - @ViewData["Title"]</h1>
+
+    @foreach (var ex in Model)
+    {
+    <div>ERROR<br />
+    @ex.GetType()
+    <br />
+    @ex.Message
+    </div>
+    <hr />
+    }
