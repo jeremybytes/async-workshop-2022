@@ -11,14 +11,15 @@ Understanding is critical. When done correctly, we can make our applications mor
 
 In this half-day workshop, we'll start at the beginning to see how "await" relates to "Task”. We'll do this by calling an asynchronous method, getting a result, and handling errors that come up. We will create our own "awaitable" methods to see how Task and return types work together. With our own methods, we'll also better understand why we may (or may not) care about getting back to the original calling thread. We'll also cover some dangers, such as using "async void" or misusing ".Result". Finally, we'll use Task to run multiple operations in parallel to make things faster. With all of these skills, we can write more effective asynchronous code.
 
-For this workshop, it is assumed that you have experience with C#, but no specific asynchronous programming experience is needed. To run the samples code, you will need .NET 6.0 installed. Jeremy will be using Visual Studio 2022, but the code samples will run using Visual Studio Code or the editor of your choice.
-
 You will learn:  
 * How to use "await" and "Task" to run asynchronous methods  
 * About handling errors from asynchronous processes  
 * About writing your own asynchronous methods
 How to avoid pitfalls such as "async void" and ".Result"  
 * About running multiple methods in parallel  
+
+**Pre-Requisites**  
+For this workshop, it is assumed that you have some experience with C#, but no specific asynchronous programming experience is needed. To run the samples code, you will need .**NET 6.0** installed. Jeremy will be using **Visual Studio 2022**, but the code samples will run using **Visual Studio Code** or the editor of your choice.
 
 Running the Samples
 -------------------
