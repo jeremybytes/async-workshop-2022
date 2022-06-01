@@ -19,7 +19,7 @@ How to avoid pitfalls such as "async void" and ".Result"
 * About running multiple methods in parallel  
 
 **Pre-Requisites**  
-For this workshop, it is assumed that you have some experience with C#, but no specific asynchronous programming experience is needed. To run the samples code, you will need .**NET 6.0** installed. Jeremy will be using **Visual Studio 2022**, but the code samples will run using **Visual Studio Code** or the editor of your choice.
+For this workshop, it is assumed that you have some experience with C#, but no specific asynchronous programming experience is needed. To run the sample code, you will need .**NET 6.0** installed. Jeremy will be using **Visual Studio 2022**, but the code samples will run using **Visual Studio Code** or the editor of your choice.
 
 Running the Samples
 -------------------
