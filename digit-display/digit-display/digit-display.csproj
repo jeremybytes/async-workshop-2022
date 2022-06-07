@@ -1,0 +1,28 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net6.0-windows</TargetFramework>
+	<ImplicitUsings>enable</ImplicitUsings>
+	<Nullable>enable</Nullable>
+    <RootNamespace>DigitDisplay</RootNamespace>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Drawing.Common" Version="6.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\recognizer\recognizer.csproj" />
+  </ItemGroup>
+
+	<Target Name="CopyDataFiles" AfterTargets="Build">
+		<ItemGroup>
+			<DataFiles Include="$(ProjectDir)..\Data\*.csv" />
+		</ItemGroup>
+
+		<Copy SourceFiles="@(DataFiles)" DestinationFolder="$(TargetDir)\" SkipUnchangedFiles="true" />
+	</Target>
+
+</Project>
