@@ -40,17 +40,17 @@ public class OrderReader : DataReader
         return Task.FromResult<Order>(order);
     }
 
-    private async Task<Order?> GetOrderDetailsAsync(int orderId)
+    private async Task<Order> GetOrderDetailsAsync(int orderId)
     {
         HttpResponseMessage response =
             await client.GetAsync($"order/{orderId}").ConfigureAwait(false);
 
-        if (response.StatusCode == HttpStatusCode.OK)
-        {
-            var stringResult =
-                await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-            return JsonSerializer.Deserialize<Order>(stringResult, options);
-        }
-        return null;
+        if (!response.IsSuccessStatusCode)
+            throw new HttpRequestException($"Unable to complete request: status code {response.StatusCode}");
+
+        var stringResult =
+            await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+        var result = JsonSerializer.Deserialize<Order>(stringResult, options);
+        return result ?? new Order();
     }
 }

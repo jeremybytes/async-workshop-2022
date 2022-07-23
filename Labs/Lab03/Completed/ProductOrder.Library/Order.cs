@@ -66,12 +66,12 @@ public class OrderReader : DataReader
         HttpResponseMessage response =
             await client.GetAsync($"order/{orderId}").ConfigureAwait(false);
 
-        if (response.StatusCode == HttpStatusCode.OK)
-        {
-            var stringResult =
-                await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-            return JsonSerializer.Deserialize<Order>(stringResult, options)!;
-        }
-        return new Order();
+        if (!response.IsSuccessStatusCode)
+            throw new HttpRequestException($"Unable to complete request: status code {response.StatusCode}");
+
+        var stringResult =
+            await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+        var result = JsonSerializer.Deserialize<Order>(stringResult, options);
+        return result ?? new Order();
     }
 }
