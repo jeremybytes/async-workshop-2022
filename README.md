@@ -105,9 +105,9 @@ Hands-On Labs (Bonus Material)
 --------------
 The "Labs" folder contains hands-on labs. These labs are not directly covered in the workshop due to time constraints but are provided as additional resources that can be completed separately.  
 
-* [Lab 01 - Recommended Practices and Continuations](https://github.com/jeremybytes/async-workshop-2021/tree/main/Labs/Lab01)
-* [Lab 02 - Unit Testing Asynchronous Methods](https://github.com/jeremybytes/async-workshop-2021/tree/main/Labs/Lab02)
-* [Lab 03 - Working with AggregateException](https://github.com/jeremybytes/async-workshop-2021/tree/main/Labs/Lab03)
+* [Lab 01 - Recommended Practices and Continuations](https://github.com/jeremybytes/async-workshop-2022/tree/main/Labs/Lab01)
+* [Lab 02 - Unit Testing Asynchronous Methods](https://github.com/jeremybytes/async-workshop-2022/tree/main/Labs/Lab02)
+* [Lab 03 - Working with AggregateException](https://github.com/jeremybytes/async-workshop-2022/tree/main/Labs/Lab03)
 
 Each lab consists of the following:
 
