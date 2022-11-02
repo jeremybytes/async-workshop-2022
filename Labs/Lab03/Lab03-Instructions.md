@@ -1,514 +1,434 @@
-Lab 03 - Working with AggregateException
+Lab 03 - Adding Async to an Existing Application
 ================================================
 
 Objectives
 -----------
-This lab shows some techniques to work with AggregateExceptions thrown by Task, including getting partial exceptions with "await" and using a continuation to get the full exception. Also included, running multiple tasks concurrently and getting results.
+This lab takes an existing application and adds async to key methods (in order to avoid blocking). Asynchrony is bubbled up through various levels of the application.
 
 Application Overview
----------------------
+--------------------
 
 The "Starter" folder contains the code files for this lab. 
 
+**Visual Studio 2022:** Open the "Mazes.sln" solution.  
 **Visual Studio Code:** Open the "Starter" folder in VS Code.  
-**Visual Studio 2022:** Open the "DataProcessor.sln" solution.
 
-*Note: The lab also contains a "Completed" folder with the finished solution. If you get stuck along the way or have issues with debugging, take a look at the code in the "Completed" folder for guidance.*
+This is a console application that produces mazes. There are a number of algorithms that generate mazes with different speeds and biases (a bias could be a tendency to include diagonal paths, longer/shorter paths, or twistier/straighter paths). 
 
-This solution is a console application that retrieves an Order object using a set of services. Since we are dealing with exception handling, these services don't actually exist. (That's where the exceptions will come from.)
+The "MazeWeb" project contains a web application that creates and shows the mazes.
 
-Start by running the console application.
+The "MazeGeneration" project contains the "MazeGenerator" that creates the mazes.
 
-**Visual Studio Code**  
-For Visual Studio Code, we'll run the application from the command line. (This is the most consistent experience.)
+The "Algorithms" project contains a number of different maze algorithms used to produce the mazes.
 
-Here's one way to get to the right folder in Windows. In File Explorer, open the folder that contains the test project: *[working_directory]/ProductOrder.Viewer/*. From the "File" menu, choose "Open Windows PowerShell". This will give you a prompt to the correct location.
+The "MazeGrid" project contains the infrastructure for the grid, cells, text outputs, and graphical outputs. This code was originally taken from the book "Mazes for Programmers" and translated from Ruby to C#.
 
-```
-PS C:\Lab03\Starter\ProductOrder.Viewer>
-```
+Build the solution and run the web application. A browser window will pop up with parameters to select. Select some values from the drop-downs and click the button. This will show a maze created using the selected parameter. The different shades of color are a a "heat map" with the darker areas being furthest from the center of the maze and lighter areas being closer to the center of the maze.  
 
-From here, type "dotnet run" to run the application.
+> Note: You may get a runtime error if you do not have a developer certificate on your machine (for HTTPS). To create a developer certificate, type the following:
+> 
+> ```
+> dotnet dev-certs https
+> ```
+> 
+> Then to trust the certificate, type the following:  
+> 
+> ```
+> dotnet dev-certs https --trust
+> ```
+> 
+> You will get a popup verifying that you want to trust the certificate on your machine. Click "Yes".
+> 
+> *Note: the trust step works on Windows and macOS only. Check the Microsoft docs for "dotnet dev-certs" for more information on using this on Linux.*  
 
-```
-PS C:\Lab03\Starter\ProductOrder.Viewer> dotnet run
-```
-
-You should get output similar to the following:
-
-```
-Getting Order ID: 8
----
-Exception Type:
-    System.NotImplementedException
-Exception Message:
-    This has not been implemented yet
-Inner Exception:
-    NONE
----
-
-Press any key to continue...
- ```
-
-**Visual Studio 2022**  
-If you are using Visual Studio 2022, run the application in the debugger (using F5, the toolbar button, or "Debug->Start Debugging" from the menu).
-
-A console window will open with the same output as above:
-
-```
-Getting Order ID: 8
----
-Exception Type:
-    System.NotImplementedException
-Exception Message:
-    This has not been implemented yet
-Inner Exception:
-    NONE
----
-
-Press any key to continue...
- ```
+Try different maze sizes and algorithms. Larger mazes will take longer to generate (compare "75" to "175"). Also different algorithms take different times. "Sidewinder" is a deterministic algorithm so will always run with a consistent speed. "Hunt and Kill" and "Recursive Backtracker" both have random elements, so will take different amounts of time to run.
 
 Lab Goals
-----------
+---------
+There are two "slow" areas of this application:  
 
-We have several goals:
+* Generating the maze  
+* Creating the output image  
 
-1. Add functionality to the GetOrderAsync method. For this, we will make several concurrent service calls.
+Because we do not want to block the incoming request threads in our web application, we will make both of these methods asynchronous.
 
-2. Await a Task that throws an AggregateException to see how it is automatically unwrapped to show the first exception.
+The "MazeGenerator" class creates the grid and uses the maze algorithm to create the maze. The "Generate" method is one that we want to make asynchronous.
 
-3. Write a continuation so that we can see the all of the exceptions that are contained in the AggregateException.
+The "Grid" class creates the output image. The "ToPng" method is one that we want to make asynchronous.
 
-Relevant Files/Classes
-----------------------
-**ProductOrder.Library/Order.cs**  
-This contains the "Order" class as well as the "OrderReader" class.  
+With these methods updated, we will also change the upstream methods and use/add asynchrony as necessary.
 
-The "OrderReader" class has a "GetOrderAsync" method that assembles the order. This is the primary method that we will be working in.
+Current Classes
+---------------
 
+MazeGeneration/MazeGenerator.cs:
 ```c#
-public Task<Order> GetOrderAsync(int orderId)
+public class MazeGenerator : IMazeGenerator
 {
-    var order = new Order();
-    try
+    public void GenerateMaze()
     {
-        throw new NotImplementedException("This has not been implemented yet");
+        algorithm.CreateMaze(mazeGrid);
+        isGenerated = true;
     }
-    catch (Exception ex)
-    {
-        logger.LogException(ex);
-    }
-
-    return Task.FromResult<Order>(order);
+    public string GetTextMaze(bool includePath = false) { ... }
+    public Image GetGraphicalMaze(bool includeHeatMap = false) { ... }
+    ...
 }
 ```
 
-We will fill in the code inside the "try" block. (See the "Hints" below for more details.)
-
-This class also has a "GetOrderDetailsAsync" method that makes a service call to get several of the order fields.
-
-**ProductOrder.Library/Customer.cs**  
-This file contains the "Customer" and "CustomerReader" classes. The OrderReader (above) will use the "CustomerReader" class to get the customer on the order.
-
-**ProductOrder.Library/Product.cs**  
-This file contains the "Product" and "ProductReader" classes. The OrderReader (above) will use the "ProductReader" class to get the products on the order.
-
-**ProductOrder.Library/ConsoleExceptionLoggers.cs**  
-This class logs exceptions to the console. It already knows how to display different types of exceptions. This will let us see different outputs as we go.
-
-**ProductOrder.Viewer/Program.cs**  
-This is the console application. Here is the "Main" method:
-
+MazeGrid/Grid.cs:  
 ```c#
-static async Task Main(string[] args)
+public abstract class Grid
 {
-    int orderId = 8;
-
-    Console.Clear();
-    Console.WriteLine($"Getting Order ID: {orderId}");
-
-    var logger = new ConsoleExceptionLogger();
-    var orderReader = new OrderReader(logger);
-    var order = await orderReader.GetOrderAsync(orderId);
-    if (order.Id == orderId)
-    {
-        OutputOrder(order);
-    }
-
-    Console.WriteLine();
-    Console.WriteLine("Press any key to continue...");
-    Console.ReadKey();
+    public Image ToPng(int cellSize = 10) { ... }
+    ...
 }
 ```
 
-We won't make any changes to this method, but you can see that it uses the OrderReader.
+MazeWeb/Controllers/MazeController.cs:  
+```c#
+public class MazeController : Controller
+{
+    public IActionResult Index(int size, string algo, MazeColor color) { ... }
+    private int GetSize(int size) { ... }
+    private IMazeAlgorithm GetAlgorithm(string algo) { ... }
+    private Image GenerateMazeImage(int mazeSize, IMazeAlgorithm algorithm, MazeColor color) { ... }
+    private static byte[] ConvertToByteArray(Image img) { ... }
+}
+```
 
 Hints
-------
-All of the code changes are in the "Order.cs" file, specifically in the "GetOrderAsync" method.
+-----
+If an asynchronous version of a method does not exist, look at creating and running a new Task to wrap the existing method.
 
-* To create the order, you will need data from the following methods:  
-    * OrderReader.GetOrderDetailsAsync()
-    * Customer.GetCustomerForOrderAsync()
-    * Product.GetProductsForOrderAsync()
+**Maze Generation**  
+In MazeGenerator.cs:
+* Make the "Generate" method asynchronous. This can be done within the "Generate" method or by updating "IMazeAlgorithm" (specifically, the "CreateMaze" method).
 
-* Rather than awaiting each method individually, run them and grab on to the resulting task.
+* Update methods that call the "Generate" method.
 
-* Use "Task.WhenAll" to see when all tasks have completed.
+In MazeController.cs:  
+* Modify methods that call the MazeGenerator by either passing the Task along or "awaiting" methods. (Note: there may be functional differences between these two options.)
 
-* Use the task results to create the order.
+* Remember that controller actions can be asynchronous.
 
-Additional Information
-* With the method above, each Task will throw it's own excpetion. The task returned by "Task.WhenAll" has an AggregateException with all three exceptions.
+**Image Creation**  
+In Grid.cs:  
+* Create an asynchronous version of the "ToPng" method.
 
-* When using "await" with "Task.WhenAll", only the first of the inner exceptions is shown.
+* Update any calls to "ToPng" to use the asynchronous version.
 
-* By using a continuation on the "Task.WhenAll", you can get to the AggregateException directly and pass it to the logger.
+* As with the Maze Generation task, keep working your way through the method callers until you get to the MazeController class.
 
-If you want more assistance, step-by-step instructions are included below. Otherwise, if you'd like a challenge, **STOP READING NOW**
+**BONUS CHALLENGE: Additional Methods**
+* Note: There is an asynchronous version of the "SaveAsPng" method. Locate this method call and use the asynchronous version.
 
-Building the Order: Step-By-Step
--------------
-1. Open the "Order.cs" file and review the "GetOrderAsync" method.
+If you want more assistance, step-by-step instructions are included below. Otherwise, if you'd like to challenge yourself, **STOP READING NOW**
 
+
+Maze Generation: Step-By-Step
+-------------------------------
+1. Open the "MazeGeneration/MazeGenerator.cs" file.
+
+2. Make the "GenerateMaze" method asynchronous.
+
+Here is the current method:  
 ```c#
-public Task<Order> GetOrderAsync(int orderId)
-{
-    var order = new Order();
-    try
+    public void GenerateMaze()
     {
-        throw new NotImplementedException("This has not been implemented yet");
+        algorithm.CreateMaze(mazeGrid);
+        isGenerated = true;
     }
-    catch (Exception ex)
+```
+
+There are 2 options. With the first option, we can wrap the "CreateMaze" call in a Task. This would look like the following:  
+
+```c#
+    public async Task GenerateMaze()
     {
-        logger.LogException(ex);
+        await Task.Run(() => algorithm.CreateMaze(mazeGrid));
+        isGenerated = true;
     }
-
-    return Task.FromResult<Order>(order);
-}
 ```
 
-We want to replace the code in the "try" block with the functionality to build the order object.
+Although this works, I would prefer to make the "CreateMaze" method asynchronous. This could allow the different maze algorithms to implement their own asynchrony (for example, if an algorithm "awaits" a Task).
 
-2. Review the Order class (in the same file).
+For this option, we will modify the "IMazeAlgorithm" interface.
 
-The Order class has the following members:
+3. Open the "Algorithms/IMazeAlgoritm.cs" file.
 
-```c#
-public class Order
-{
-    public int Id { get; set; }
-    public DateTime DateOrdered { get; set; }
-    public DateTime DateFulfilled { get; set; }
-    public Customer? Customer { get; set; }
-    public List<Product>? Products { get; set; }
-}
-```
-
-To fill in these properties, we can use the following methods:
-
-* OrderReader.GetOrderDetailsAsync for
-    * Id
-    * DateOrdered
-    * DateFulfilled
-* Customer.GetCustomerForOrderAsync() for
-    * Customer
-* Product.GetProductsForOrderAsync() for
-    * Products
-
-3. Call the methods listed above and hang on to the tasks.
-
-Inside the "try" block of the "GetOrderAsync" method, call the various methods required for the order and save each Task in a local variable.
-
-*Note: The OrderReader class has fields for the CustomerReader and the OrderReader, so we can use those to make our calls.*  
+4. Add a new "CreateMazeAsync" method with the following code:  
 
 ```c#
-public Task<Order> GetOrderAsync(int orderId)
-{
-    var order = new Order();
-    try
+    public interface IMazeAlgorithm
     {
-        Task<Order> orderDetailsTask = 
-            GetOrderDetailsAsync(orderId);
-        Task<Customer> customerTask = 
-            customerReader.GetCustomerForOrderAsync(orderId);
-        Task<List<Product>> productTask = 
-            productReader.GetProductsForOrderAsync(orderId);
+        void CreateMaze(Grid grid);
+        Task CreateMazeAsync(Grid grid)
+        {
+            return Task.Run(() => CreateMaze(grid));
+        }
     }
-    catch (Exception ex)
+```
+
+This adds a method to the interface that has a default implementation. If the implementing "algorithm" class does not include its own CreateMazeAsync method, then the one from the interface is used. As mentioned above, this gives each algorithm the option of adding its own methods that have async built in.  
+
+5. Back in the "MazeGenerator" class, update "Generate" to call the new async method.  
+
+```c#
+    public async Task GenerateMaze()
     {
-        logger.LogException(ex);
+        await algorithm.CreateMazeAsync(mazeGrid);
+        isGenerated = true;
     }
-
-    return Task.FromResult<Order>(order);
-}
 ```
 
-4. Wait for all three tasks to complete.
+If we try to build the solution, we get an error that the "MazeGenerator" class does not implement all of the members of the "IMazeGenerator" interface. This is because we changed the signature of the "Generate" method.
 
-Use "await Task.WhenAll" with the three tasks as the parameter. This will wait for all three tasks to complete. (This is still inside the "try" block.)
+6. Open the "MazeGeneration/IMazeGenerator.cs" file.
+
+7. Update the method signature of the "Generate" method by changing the return type from "void" to "Task".
 
 ```c#
-await Task.WhenAll(orderDetailsTask, customerTask, productTask)
-    .ConfigureAwait(false);
+    public interface IMazeGenerator
+    {
+        Task GenerateMaze();
+        Image GetGraphicalMaze(bool includeHeatMap = false);
+        string GetTextMaze(bool includePath = false);
+    }
 ```
 
-*Note: Also use "ConfigureAwait(false)" since we are in a class library.*
+At this point, the application will build. But if we run the application, we will get a runtime error when we try to generate a maze.
 
-We need to do a couple more things to finish this up. Add the "async" modifier to the method signature (if it isn't there already).
+To see why, let's look at the "GetGraphicalMaze" method on the "MazeGenerator" class.
 
 ```c#
-public async Task<Order> GetOrderAsync(int orderId)
+    public Image GetGraphicalMaze(bool includeHeatMap = false)
+    {
+        if (!isGenerated)
+            GenerateMaze();
+
+        if (includeHeatMap)
+        {
+            Cell start = mazeGrid.GetCell(mazeGrid.Rows / 2, mazeGrid.Columns / 2);
+            mazeGrid.distances = start.GetDistances();
+        }
+        var result = mazeGrid.ToPng(30);
+        return result;
+    }
 ```
 
-Then change the return type from
+Notice that "GenerateMaze" is called in this method, but it is not awaited. This means that the maze generation gets kicked off, but the rest of the method runs before that generation is complete.
+
+To fix this, we can "await" the "GenerateMaze" call.
+
+8. Add "await" before "GenerateMaze" and update the return type to "Task&lt;Image&gt;". (Don't forget to add the "async" modifier as well.)
 
 ```c#
-return Task.FromResult<Order>(order);
+    public async Task<Image> GetGraphicalMaze(bool includeHeatMap = false)
+    {
+        if (!isGenerated)
+            await GenerateMaze();
+
+        ... // rest of the method not shown
+    }
 ```
 
-to
+9. Make the same change to the "GetTextMaze" method:  
 
 ```c#
-return order;
+    public async Task<string> GetTextMaze(bool includePath = false)
+    {
+        if (!isGenerated)
+            await GenerateMaze();
+
+        ... // rest of the method not shown
+    }
+```
+
+*Note: "GetTextMaze" is used for console applications to generate a text-based maze. Although it is not used in the web application, we should update this method while we are here.*  
+
+10. Update the method signatures of "IMazeAlgorithm".  
+
+Since we changed the return types for "GetGraphicalMaze" and "GetTextMaze", we need to update those methods in the interface as well.  
+
+```c#
+    public interface IMazeGenerator
+    {
+        Task GenerateMaze();
+        Task<Image> GetGraphicalMaze(bool includeHeatMap = false);
+        Task<string> GetTextMaze(bool includePath = false);
+    }
 ```  
 
-We need to change the return value because of the nature of "await". When nothing in an asynchronous method is awaited, we need to explicitly return a Task (in this case, by using "Task.FromResult"). When something *is* awaited within a method, any return value is automatically wrapped in a Task. Because of this, we just return the value ("order") and rely on the compiler to take care of the rest.
+If we try to build at this point, we get an error in the "MazeController" of the web application. Our next steps will be to continue making methods async inside the controller.  
 
-5. Use the task results to complete the order object.
+11. Open the "MazeWeb/Controllers/MazeController.cs" file.  
 
-Since we awaited a "WhenAll", we know that all of the tasks are complete. This means that we can safely access the "Result" property on each task to fill in our order. (This is inside the "try" block.)
-
-```c#
-order = orderDetailsTask.Result;
-order.Customer = customerTask.Result;
-order.Products = productTask.Result;
-```
-
-Here's the completed method:
+12. In the "GenerateMazeImage" method, "await" the call to "GetGraphicalMaze" (and change the method signature as needed).  
 
 ```c#
-public async Task<Order> GetOrderAsync(int orderId)
-{
-    var order = new Order();
-    try
+    private async Task<Image> GenerateMazeImage(int mazeSize, IMazeAlgorithm algorithm, MazeColor color)
     {
-        Task<Order> orderDetailsTask = 
-            GetOrderDetailsAsync(orderId);
-        Task<Customer> customerTask = 
-            customerReader.GetCustomerForOrderAsync(orderId);
-        Task<List<Product>> productTask = 
-            productReader.GetProductsForOrderAsync(orderId);
+        IMazeGenerator generator =
+            new MazeGenerator(
+                new ColorGrid(mazeSize, mazeSize, color),
+                algorithm);
 
-        await Task.WhenAll(orderDetailsTask, customerTask, productTask)
-            .ConfigureAwait(false);
-
-        order = orderDetailsTask.Result;
-        order.Customer = customerTask.Result;
-        order.Products = productTask.Result;
+        Image maze = await generator.GetGraphicalMaze(true);
+        return maze;
     }
-    catch (Exception ex)
+```
+
+If we try to build at this point, we get an error in the "MazeController". We need to continue adding async to the "Index" method.
+
+13. In the "Index" method, "await" the "GenerateMazeImage" method (and update the method signature).  
+
+```c#
+    public async Task<IActionResult> Index(int size, string algo, MazeColor color)
     {
-        logger.LogException(ex);
+        int mazeSize = GetSize(size);
+        IMazeAlgorithm algorithm = GetAlgorithm(algo);
+        Image mazeImage = await GenerateMazeImage(mazeSize, algorithm, color);
+        byte[] byteArray = ConvertToByteArray(mazeImage);
+        return File(byteArray, "image/png");
     }
-
-    return order;
-}
 ```
 
-Awaiting the AggregateException
--------------
-"Task.WhenAll" waits for a set of tasks to complete and returns another task. If any of the tasks throw an exception, then the returned task is "faulted" (meaning, it is marked as having generated an exception).
+*Note: "Index" is a controller action. The good news is that ASP.NET Core can handle asynchronous controller actions. We do not need to add any additional code or configuration for this action to work.*  
 
-"Task.WhenAll" wraps the thrown exceptions in an AggregateException. This AggregateException has a collection of inner exceptions with all of the exceptions that are thrown. In our case, all three tasks throw an exception, so the AggregateException will contain three inner exceptions.
+14. Build and run
 
-When we "await" a faulted task, it automatically unwraps the AggregateException and throws the first inner exception that it finds.
+At this point, the solution builds successfully. When we run the application, we get the same visual behavior as before. However, behind the scenes, the maze generation is happening on a separate thread. This means that we are not blocking a request thread during the maze generation.  
 
-In the "catch" block, this unwrapped exception is logged to the console.
+Next, we will do the same thing with the image creation.  
 
-We can see this by running the application.
+Image Creation: Step-By-Step
+-------------------------------
+1. Open the "MazeGrid/Grid.cs" file.  
 
-1. Run the application from inside Visual Studio (or by using "dotnet run" from the command line).
+2. Note the "ToPng" method.  
 
-The output is as follows:
+This method generates a .png file for the maze. This process can take a while to complete, particularly for large grid sizes.  
 
-```
-Getting Order ID: 8
----
-Exception Type:
-    System.Net.Http.HttpRequestException
-Exception Message:
-    No connection could be made because the target machine actively refused it.
-Inner Exception:
-    System.Net.Sockets.SocketException
-    No connection could be made because the target machine actively refused it.
----
+To avoid blocking the request thread, we will move this processing to a Task. But instead of modifying the existing "ToPng" method, we will add a new method wrapper.  
 
-Press any key to continue...
-```
-
-This shows a single exception: an HttpRequestException. This is thrown because there are no services running for this application to connect to.
-
-This is often the enough information for us to handle the error (and this is why "await" does this).
-
-But we can get to all of the exceptions by adding a continuation to the task that is returned by "WhenAll".
-
-Adding a Continuation to Get All of the Exceptions: Step-By-Step
--------------
-To get around the unwrapping of the AggregateException that "await" does, we will add a continuation to the task returned by "Task.WhenAll".
-
-1. Add a call to ".ContinueWith" and pass the task exception to the logger.
+3. Add a new method called "ToPngAsync" that wraps the "ToPng" method.  
 
 ```c#
-await Task.WhenAll(orderDetailsTask, customerTask, productTask)
-    .ContinueWith(task =>
+    public Task<Image> ToPngAsync(int cellSize = 10)
+    {
+        return Task.Run(() => ToPng(cellSize));
+    }
+```
+
+4. Just like above, create a "ToStringAsync" method that wraps the "ToString" method.  
+
+```c#
+    public Task<string> ToStringAsync()
+    {
+        return Task.Run(() => ToString());
+    }
+```
+
+*Note: This method is used for console applications and text output. As earlier, even though the web application does not use this method, we will update it while we are here.*  
+
+5. In the "GetGraphicalMaze" method of the "MazeGenerator" class, change "ToPng" to "ToPngAsync" (and be sure to "await" it).  
+
+```c#
+    public async Task<Image> GetGraphicalMaze(bool includeHeatMap = false)
+    {
+        if (!isGenerated)
+            await GenerateMaze();
+
+        if (includeHeatMap)
         {
-            logger.LogException(task.Exception);
-        })
-    .ConfigureAwait(false);
+            Cell start = mazeGrid.GetCell(mazeGrid.Rows / 2, mazeGrid.Columns / 2);
+            mazeGrid.distances = start.GetDistances();
+        }
+        var result = await mazeGrid.ToPngAsync(30);
+        return result;
+    }
 ```
 
-The "task.Exception" inside the continuation is the full AggregateException. The logger knows how to look at the inner exceptions for an AggregateException.
+Since the "GetGraphicalMaze" method is already asynchronous, all we need to do is add the "await" and change "ToPng" to "ToPngAsync".
 
-2. Restrict the continuation to only run when the task is faulted.
-
-Add "TaskContinuationsOptions.OnlyOnFaulted" as a parameter to the "ContinueWith" method.
+6. Change "GetTextMaze" to use "ToStringAsync" instead of "ToString".  
 
 ```c#
-await Task.WhenAll(orderDetailsTask, customerTask, productTask)
-    .ContinueWith(task =>
+    public async Task<string> GetTextMaze(bool includePath = false)
+    {
+        if (!isGenerated)
+            await GenerateMaze();
+
+        if (includePath)
         {
-            logger.LogException(task.Exception!);
-        }, TaskContinuationOptions.OnlyOnFaulted)
-    .ConfigureAwait(false);
+            Cell start = mazeGrid.GetCell(mazeGrid.Rows / 2, mazeGrid.Columns / 2);
+            mazeGrid.path = start.GetDistances().PathTo(mazeGrid.GetCell(mazeGrid.Rows - 1, 0));
+        }
+
+        var result = await mazeGrid.ToStringAsync();
+        return result;
+    }
 ```
 
-This continuation will only run if the task is faulted. This is important because if the task is not faulted, then the "task.Exception" property would be null.
+7. Build and run.
 
-TaskContinuationOptions let us restrict when a continuation will run. They are really useful. Here are some of the options I've found useful:  
-* OnlyOnFaulted
-* OnlyOnCanceled
-* OnlyOnRanToCompletion (i.e., success)
-* NotOnFaulted
-* NotOnCanceled
-* NotOnRanToCompletion
+At this point, the solution builds successfully. When we run the application, we get the same visual behavior as before. However, behind the scenes, the image creation is happening on a separate thread. This means that we are not blocking a request thread during the image creation.  
 
-*Note: There is also an exclamation point after "task.Exception". The compiler thinks that "task.Exception" may be null (which is why there are green squiggles under it). But since we are specifying "OnlyOnFaulted", we know that Exception will not be null. When we add the "!", we let the compiler know that this property will not be null, and the warning will be hidden.*  
+BONUS CHALLENGE: Additional Methods
+-----------------------------------  
 
-3. Re-run the application.
+Now that we have added async to our application, we can look for other place where we can update to asynchronous methods. One example is in the MazeController class.
 
-When we run the application, the output will be a bit different. I've truncated some of the results for this display:
+1. Open the "MazeWeb/Controllers/MazeController.cs" file.  
 
-```
-Getting Order ID: 8
----
-Exception Type:
-    System.AggregateException
-Exception Message:
-    One or more errors occurred. (...)
-Inner Exception:
-    System.Net.Http.HttpRequestException
-    No connection could be made...
-Inner Exceptions Count: 3
-
-InnerExceptions[0]:
-    System.Net.Http.HttpRequestException
-    No connection could be made...
-
-InnerExceptions[1]:
-    System.Net.Http.HttpRequestException
-    No connection could be made...
-
-InnerExceptions[2]:
-    System.Net.Http.HttpRequestException
-    No connection could be made...
----
----
-Exception Type:
-    System.AggregateException
-Exception Message:
-    One or more errors occurred. (...)
-Inner Exception:
-    System.Net.Http.HttpRequestException
-    No connection could be made ...
-Inner Exceptions Count: 1
-
-InnerExceptions[0]:
-    System.Net.Http.HttpRequestException
-    No connection could be made ...
----
-
-Press any key to continue...
-```
-
-We have a little bit of a problem here. The first Exception block (the one between the first set of "---" markers) is fine. This shows an AggregateException that has three inner exceptions, and each of those inner exceptions is displayed.
-
-But the second Exception block shows another AggregateException. This is coming from the "orderDetailsTask".
-
-Here's the relevant line:
+2. Look at the "ConvertToByteArray" method.  
 
 ```c#
-order = orderDetailsTask.Result;
+    private static byte[] ConvertToByteArray(Image img)
+    {
+        using var stream = new MemoryStream();
+        img.SaveAsPng(stream);
+        return stream.ToArray();
+    }
 ```
 
-The "orderDetailsTask" is faulted (meaning, it threw an exception). If you try to access the "Result" property on a faulted task, an AggregateException is thrown that contains the appropriate inner exception(s).
+This method takes an image and converts it to a byte array. The method currently uses a "SaveAsPng" method. If we look at the other options available, we will find a "SaveAsPngAsync" method.  
 
-5. Set up a guard clause to prevent use of a faulted task.
-
-To prevent using faulted tasks, we can use the "task.IsCompletedSuccessfully" property to put a guard clause before the order assignments.
+3. Update "ConvertToByteArray" to use the "SaveAsPngAsync" method.  
 
 ```c#
-if (orderDetailsTask.IsCompletedSuccessfully &&
-    customerTask.IsCompletedSuccessfully &&
-    productTask.IsCompletedSuccessfully)
-{
-    order = orderDetailsTask.Result;
-    order.Customer = customerTask.Result;
-    order.Products = productTask.Result;
-}
+    private static async Task<byte[]> ConvertToByteArray(Image img)
+    {
+        using var stream = new MemoryStream();
+        await img.SaveAsPngAsync(stream);
+        return stream.ToArray();
+    }
 ```
 
-This will ensure that the order is only updated if *all* of the tasks complete successfully.
+4. The last step is to "await" this method in the "Index" action.  
 
-6. Re-run the application.
-
-When we run the application, we now see the complete AggregateException (and just one AggregateException).
-
-```
-Getting Order ID: 8
----
-Exception Type:
-    System.AggregateException
-Exception Message:
-    One or more errors occurred. (...)
-Inner Exception:
-    System.Net.Http.HttpRequestException
-    No connection could be made ...
-Inner Exceptions Count: 3
-
-InnerExceptions[0]:
-    System.Net.Http.HttpRequestException
-    No connection could be made ...
-
-InnerExceptions[1]:
-    System.Net.Http.HttpRequestException
-    No connection could be made ...
-
-InnerExceptions[2]:
-    System.Net.Http.HttpRequestException
-    No connection could be made ...
----
-
-Press any key to continue...
+```c#
+    public async Task<IActionResult> Index(int size, string algo, MazeColor color)
+    {
+        int mazeSize = GetSize(size);
+        IMazeAlgorithm algorithm = GetAlgorithm(algo);
+        Image mazeImage = await GenerateMazeImage(mazeSize, algorithm, color);
+        byte[] byteArray = await ConvertToByteArray(mazeImage);
+        return File(byteArray, "image/png");
+    }
 ```
 
-Conclusion
--------------
-So this has shown us that we can run multiple tasks concurrently. This is useful if we need to assemble an object from multiple services.
+Since the "Index" action is already asynchronous, we just need to add the "await" before the call to "ConvertToByteArray".
 
-"Task.WhenAll" lets us know when all of the tasks are complete. We can use a continuation to get the complete AggregateException that otherwise gets truncated if we directly "await" it.
+5. Build and run.  
+
+The application builds and runs as expected. Try out different maze sizes and algorithms and note that larger mazes take longer to generate and some algorithms take longer than others.
+
+Now that the application has async methods, are there other async methods from the standard libraries that can be used?  
+
+Take a look through the code and see what you can find.
 
 ***
-*End of Lab 03 - Working with AggregateException*
+*End of Lab 03 - Adding Async to an Existing Application*
 ***

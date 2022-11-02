@@ -10,8 +10,8 @@ Application Overview
 
 The "Starter" folder contains the code files for this lab. 
 
+**Visual Studio 2022:** Open the "DataProcessor.sln" solution.  
 **Visual Studio Code:** Open the "Starter" folder in VS Code.  
-**Visual Studio 2022:** Open the "DataProcessor.sln" solution.
 
 *Note: The lab also contains a "Completed" folder with the finished solution. If you get stuck along the way or have issues with debugging, take a look at the code in the "Completed" folder for guidance.*
 
@@ -22,7 +22,7 @@ The "DataProcessor.Library.Tests" project contains existing tests. These use MST
 **Visual Studio Code**  
 For Visual Studio Code, we'll run the tests from the command line. (This is the most consistent experience. If you use Visual Studio Code full time, you will want to find a plug-in for your specific test framework.)
 
-Here's one way to get to the right folder in Windows. In File Explorer, open the folder that contains the test project: *[working_directory]/DataProcessor.Library.Tests/*. From the "File" menu, choose "Open Windows PowerShell". This will give you a prompt to the correct location.
+Here's one way to get to the right folder in Windows. In File Explorer, open the folder that contains the test project: *[working_directory]/DataProcessor.Library.Tests/*. Right click on an empty space in the folder and choose "Open in Terminal" or "Open in PowerShell". This will give you a prompt to the correct location.
 
 ```
 PS C:\Lab02\Starter\DataProcessor.Library.Tests>
@@ -66,7 +66,7 @@ Lab Goals
 
 We have three goals:
 
-1. Update the existing tests to properly await the async methods
+1. Update the existing tests to properly await the async methods.
 
 2. Create a fake object that can be used for testing.
 

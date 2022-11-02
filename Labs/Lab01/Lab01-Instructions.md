@@ -10,8 +10,8 @@ Application Overview
 
 The "Starter" folder contains the code files for this lab. 
 
-**Visual Studio Code:** Open the "Starter" folder in VS Code.  
 **Visual Studio 2022:** Open the "DataProcessor.sln" solution.
+**Visual Studio Code:** Open the "Starter" folder in VS Code.  
 
 *Note: The lab also contains a "Completed" folder with the finished solution. If you get stuck along the way or have issues with debugging, take a look at the code in the "Completed" folder for guidance.*
 

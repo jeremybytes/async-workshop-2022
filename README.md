@@ -103,11 +103,13 @@ public async Task<List<Person>> GetPeopleAsync(IProgress<int> progress,
 
 Hands-On Labs (Bonus Material)  
 --------------
-The "Labs" folder contains hands-on labs. These labs are not directly covered in the workshop due to time constraints but are provided as additional resources that can be completed separately.  
+The "Labs" folder contains hands-on labs. The labs are integrated throughout the workshop day.    
 
-* [Lab 01 - Recommended Practices and Continuations](https://github.com/jeremybytes/async-workshop-2022/tree/main/Labs/Lab01)
-* [Lab 02 - Unit Testing Asynchronous Methods](https://github.com/jeremybytes/async-workshop-2022/tree/main/Labs/Lab02)
-* [Lab 03 - Working with AggregateException](https://github.com/jeremybytes/async-workshop-2022/tree/main/Labs/Lab03)
+* [Lab 01 - Recommended Practices and Continuations](./Labs/Lab01/)
+* [Lab 02 - Unit Testing Asynchronous Methods](./Labs/Lab02/)
+* [Lab 03 - Adding Async to an Existing Application](./Labs/Lab03/)
+* [Lab 04 - Working with AggregateException](./Labs/Lab04/)
+* [Lab 05 - Parallel Practices](./Labs/Lab05/)
 
 Each lab consists of the following:
 
